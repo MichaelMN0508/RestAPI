@@ -14,25 +14,28 @@ type requestBody struct {
 	Task string `json:"task"`
 }
 
-func GETHandler(w http.ResponseWriter, r *http.Request) {
-	if task == "" {
-		fmt.Fprintln(w, "Hello!")
-	} else {
-		fmt.Fprintln(w, "Hello!", task)
-	}
+func GetTask(w http.ResponseWriter, r *http.Request) {
+	var tasks []Task
+	DB.Find(&tasks)
+	json.NewEncoder(w).Encode(tasks)
 }
 
-func POSTHandler(w http.ResponseWriter, r *http.Request) {
-	var requestBody requestBody
-	json.NewDecoder(r.Body).Decode(&requestBody)
-
-	task = requestBody.Task
-	fmt.Fprintf(w, "Task updated:%s", task)
+func CreateTask(w http.ResponseWriter, r *http.Request) {
+	var task Task
+	if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
+		http.Error(w, "Ошибка парсинга JSON", http.StatusBadRequest)
+		return
+	}
+	DB.Create(&task)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(task)
 }
 func main() {
+	InitDB()
+	DB.AutoMigrate(&Task{})
 	router := mux.NewRouter()
-	router.HandleFunc("/api", GETHandler).Methods("GET")
-	router.HandleFunc("/api", POSTHandler).Methods("POST")
+	router.HandleFunc("/api/tasks", GetTask).Methods("GET")
+	router.HandleFunc("/api/tasks", CreateTask).Methods("POST")
 	fmt.Println("Server running on port 8080")
 	http.ListenAndServe(":8080", router)
 }
